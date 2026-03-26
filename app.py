@@ -41,31 +41,32 @@ if menu == "Vezérlőpult":
     st.subheader("🔔 Időzített Értesítések (30, 15, 7 nap)")
     
     found_notification = False
+    milestones = [30, 15, 7]
     
     for emp in st.session_state.employees:
+        # 1. SZERZŐDÉS ELLENŐRZÉSE (ADMINOKNAK GO)
         d_sz = get_diff(emp['Szerződés vége'])
-        d_orv = get_diff(emp['Orvosi lejárat'])
-        d_tud = get_diff(emp['Tüdőszűrő lejárat'])
-        
-        milestones = [30, 15, 7]
-        
-        # 1. ADMIN ÉRTESÍTÉSEK (Szerződés vége)
         if d_sz in milestones or d_sz < 0:
             found_notification = True
+            # Piros doboz a szerződés lejáratához
             st.error(f"📩 **ADMIN ÉRTESÍTÉS** ({st.session_state.admin_email_1}, {st.session_state.admin_email_2})\n\n "
-                     f"ALKALMAZOTT: {emp['Név']} | ESEMÉNY: Munkaszerződés lejár {d_sz} nap múlva!")
+                     f"📄 ALKALMAZOTT: {emp['Név']} | ESEMÉNY: Munkaszerződés lejár {d_sz} nap múlva!")
 
-        # 2. DOLGOZÓI ÉRTESÍTÉSEK (Orvosi és Tüdőszűrő)
-        emp_issues = []
+        # 2. ORVOSI ELLENŐRZÉSE (DOLGOZÓNAK GO)
+        d_orv = get_diff(emp['Orvosi lejárat'])
         if d_orv in milestones or d_orv < 0:
-            emp_issues.append(f"⚕️ Orvosi alkalmasság ({d_orv} nap)")
-        if d_tud in milestones or d_tud < 0:
-            emp_issues.append(f"🫁 Tüdőszűrő ({d_tud} nap)")
-            
-        if emp_issues:
             found_notification = True
+            # Sárga doboz az orvosihoz
             st.warning(f"📩 **DOLGOZÓI ÉRTESÍTÉS** ({emp['Email']})\n\n "
-                       f"ALKALMAZOTT: {emp['Név']} | TEENDŐ: " + " & ".join(emp_issues))
+                       f"⚕️ ALKALMAZOTT: {emp['Név']} | TEENDŐ: Orvosi alkalmasság ({d_orv} nap)")
+
+        # 3. TÜDŐSZŰRŐ ELLENŐRZÉSE (DOLGOZÓNAK GO)
+        d_tud = get_diff(emp['Tüdőszűrő lejárat'])
+        if d_tud in milestones or d_tud < 0:
+            found_notification = True
+            # Kék doboz a tüdőszűrőhöz
+            st.info(f"📩 **DOLGOZÓI ÉRTESÍTÉS** ({emp['Email']})\n\n "
+                    f"🫁 ALKALMAZOTT: {emp['Név']} | TEENDŐ: Tüdőszűrő ({d_tud} nap)")
     
     if not found_notification:
         st.success("Nincs mára ütemezett értesítés.")
@@ -98,6 +99,7 @@ elif menu == "Alkalmazottak":
                     st.error("Név és Email kötelező!")
 
     st.write("---")
+    # Megtartottam a TÖRLÉS gombot, mert az egy hasznos fejlesztés volt
     if st.session_state.employees:
         for i, emp in enumerate(st.session_state.employees):
             cols = st.columns([2, 2, 2, 2, 1])
@@ -105,6 +107,7 @@ elif menu == "Alkalmazottak":
             cols[1].write(emp['Email'])
             cols[2].write(f"Szerz: {emp['Szerződés vége']}")
             cols[3].write(f"Orv: {emp['Orvosi lejárat']}")
+            # Törlés gomb javítva egyedi kulccsal
             if cols[4].button("🗑️", key=f"del_btn_{i}"):
                 st.session_state.employees.pop(i)
                 st.rerun()
