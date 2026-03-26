@@ -2,10 +2,10 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, date
 
-# Oldal beállítása
+# Oldal konfiguráció
 st.set_page_config(page_title="MindVault - Szerződéskezelő", layout="wide")
 
-# --- STÍLUS BEÁLLÍTÁSA ---
+# --- STÍLUS ---
 st.markdown("""
     <style>
     .main { background-color: #f8f9fa; }
@@ -19,7 +19,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- MENÜ (Oldalsáv) ---
+# --- MENÜ ---
 with st.sidebar:
     st.title("🛡️ MindVault")
     st.write("---")
@@ -27,14 +27,11 @@ with st.sidebar:
     st.write("---")
     st.caption("Bejelentkezve: Adminisztrátor")
 
-# --- ADATOK (Minta) ---
+# --- ADATOK KEZELÉSE ---
 if 'employees' not in st.session_state:
-    st.session_state.employees = [
-        {"Név": "Kovács István", "Cég": "Tornyos Pékség Kft.", "Szerződés vége": "2026-03-27", "Orvosi": "2025-06-15"},
-        {"Név": "Farkas Tibor", "Cég": "Példa Bt.", "Szerződés vége": "2026-04-30", "Orvosi": "2025-03-25"}
-    ]
+    st.session_state.employees = []
 
-# Segédfüggvény az állapothoz
+# Segédfüggvény a lejáratok színezéséhez
 def check_expiry(date_val):
     try:
         if isinstance(date_val, str):
@@ -46,40 +43,61 @@ def check_expiry(date_val):
         if diff <= 7: return "🟠 Sürgős"
         return "✅ Rendben"
     except:
-        return "❓ Ismeretlen"
+        return "❓ -"
 
-# --- OLDALAK ---
-if menu == "Vezérlőpult":
-    st.header("Vezérlőpult")
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Összes alkalmazott", len(st.session_state.employees))
-    c2.metric("Lejár 30 napon belül", "0")
-    c3.metric("Lejárt / Kritikus", "0")
-    c4.metric("Rendszer állapot", "Aktív")
-    
-    st.write("---")
-    st.subheader("📅 Havi Feladatterv")
-    st.info("Minden rendben! Nincs közeli lejárat a következő 30 napban.")
-
-elif menu == "Alkalmazottak":
+# --- ALKALMAZOTTAK NÉZET ---
+if menu == "Alkalmazottak":
     st.header("Alkalmazottak nyilvántartása")
     
-    with st.expander("➕ Új alkalmazott rögzítése"):
+    with st.expander("➕ Új alkalmazott rögzítése", expanded=True):
         with st.form("add_form"):
-            c_a, c_b = st.columns(2)
-            n_nev = c_a.text_input("Név")
-            n_ceg = c_b.selectbox("Cég", ["Tornyos Pékség Kft.", "Példa Bt."])
-            n_veg = st.date_input("Szerződés vége")
+            # 1. SOR: Név és Cég
+            col1, col2 = st.columns(2)
+            nev = col1.text_input("Név")
+            ceg = col2.selectbox("Cég", ["Tornyos Pékség Kft.", "Példa Bt.", "Egyéb"])
+            
+            # 2. SOR: Szerződés kezdete és vége
+            col3, col4 = st.columns(2)
+            sz_kezdete = col3.date_input("Szerződés kezdete", value=date.today())
+            sz_vege = col4.date_input("Szerződés vége", value=date.today())
+            
+            # 3. SOR: Alkalmassági (külön sor)
+            alkalmassagi = st.date_input("Orvosi alkalmassági lejárat", value=date.today())
+            
+            # 4. SOR: Tüdőszűrő (külön sor)
+            tudoszuro = st.date_input("Tüdőszűrő lejárat", value=date.today())
+            
+            # Mentés gomb
             if st.form_submit_button("Mentés"):
-                st.session_state.employees.append({"Név": n_nev, "Cég": n_ceg, "Szerződés vége": str(n_veg), "Orvosi": "2025-01-01"})
-                st.rerun()
+                if nev:
+                    st.session_state.employees.append({
+                        "Név": nev, 
+                        "Cég": ceg, 
+                        "Szerződés kezdete": str(sz_kezdete),
+                        "Szerződés vége": str(sz_vege), 
+                        "Orvosi lejárat": str(alkalmassagi),
+                        "Tüdőszűrő lejárat": str(tudoszuro)
+                    })
+                    st.success(f"{nev} rögzítve!")
+                    st.rerun()
+                else:
+                    st.error("A név kitöltése kötelező!")
 
-    df = pd.DataFrame(st.session_state.employees)
-    df['Állapot'] = df['Szerződés vége'].apply(check_expiry)
-    st.dataframe(df, use_container_width=True)
+    # Táblázat megjelenítése
+    if st.session_state.employees:
+        df = pd.DataFrame(st.session_state.employees)
+        
+        # Állapot oszlopok hozzáadása a figyelmeztetésekhez
+        df['Szerződés állapota'] = df['Szerződés vége'].apply(check_expiry)
+        df['Orvosi állapota'] = df['Orvosi lejárat'].apply(check_expiry)
+        
+        st.subheader("Aktuális lista")
+        st.dataframe(df, use_container_width=True)
+    else:
+        st.info("Még nincs rögzített alkalmazott.")
 
-elif menu == "Beállítások":
-    st.header("Rendszerbeállítások")
-    st.subheader("📧 E-mail Konfiguráció")
-    st.text_input("Küldő e-mail cím", "noreply@mindvault.hu")
-    st.button("Mentés")
+# --- VEZÉRLŐPULT ---
+elif menu == "Vezérlőpult":
+    st.header("Vezérlőpult")
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Összes alkalmazott", len(st
