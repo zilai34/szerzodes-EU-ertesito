@@ -41,6 +41,7 @@ def check_expiry(date_val):
         diff = (d - date.today()).days
         if diff < 0: return "🔴 Lejárt"
         if diff <= 7: return "🟠 Sürgős"
+        if diff <= 30: return "🟡 30 napon belül"
         return "✅ Rendben"
     except:
         return "❓ -"
@@ -53,7 +54,7 @@ if menu == "Alkalmazottak":
         with st.form("add_form"):
             col1, col2 = st.columns(2)
             nev = col1.text_input("Név")
-            ceg = col2.selectbox("Cég", ["Tornyos Pékség Kft.", "Példa Bt.", "Egyéb"])
+            ceg = col2.selectbox("Cég", ["Tornyos Pékség Kft.", "DJ & K Bt.", "Egyéb"])
             
             col3, col4 = st.columns(2)
             sz_kezdete = col3.date_input("Szerződés kezdete", value=date.today())
@@ -62,24 +63,29 @@ if menu == "Alkalmazottak":
             alkalmassagi = st.date_input("Orvosi alkalmassági lejárat", value=date.today())
             tudoszuro = st.date_input("Tüdőszűrő lejárat", value=date.today())
             
+            # ÚJ MEZŐ: Alkalmazott e-mail címe
+            email = st.text_input("Alkalmazott e-mail címe (értesítésekhez)")
+            
             if st.form_submit_button("Mentés"):
-                if nev:
+                if nev and email:
                     st.session_state.employees.append({
                         "Név": nev, 
                         "Cég": ceg, 
                         "Szerződés kezdete": str(sz_kezdete),
                         "Szerződés vége": str(sz_vege), 
                         "Orvosi lejárat": str(alkalmassagi),
-                        "Tüdőszűrő lejárat": str(tudoszuro)
+                        "Tüdőszűrő lejárat": str(tudoszuro),
+                        "Email": email
                     })
                     st.success(f"{nev} rögzítve!")
                     st.rerun()
+                elif not email:
+                    st.error("Az e-mail cím kitöltése kötelező az értesítésekhez!")
                 else:
                     st.error("A név kitöltése kötelező!")
 
     if st.session_state.employees:
         df = pd.DataFrame(st.session_state.employees)
-        df['Szerződés állapota'] = df['Szerződés vége'].apply(check_expiry)
         df['Orvosi állapota'] = df['Orvosi lejárat'].apply(check_expiry)
         st.subheader("Aktuális lista")
         st.dataframe(df, use_container_width=True)
@@ -89,16 +95,34 @@ if menu == "Alkalmazottak":
 # --- VEZÉRLŐPULT ---
 elif menu == "Vezérlőpult":
     st.header("Vezérlőpult")
-    c1, c2, c3, c4 = st.columns(4)
-    # Itt volt a hiba, most javítva:
+    c1, c2, c3 = st.columns(3)
     c1.metric("Összes alkalmazott", len(st.session_state.employees))
     c2.metric("Rendszer állapot", "Aktív")
+    
+    # Gyors lista a közeli lejáratokról
     st.write("---")
-    st.info("Válassza az 'Alkalmazottak' menüpontot az adatok rögzítéséhez.")
+    st.subheader("🔔 Közelgő lejáratok (30 napon belül)")
+    
+    found_any = False
+    for emp in st.session_state.employees:
+        d = datetime.strptime(emp['Orvosi lejárat'], "%Y-%m-%d").date()
+        diff = (d - date.today()).days
+        if 0 <= diff <= 30:
+            st.warning(f"**{emp['Név']}** orvosi alkalmassága lejár {diff} nap múlva! (Email: {emp['Email']})")
+            found_any = True
+    
+    if not found_any:
+        st.success("Nincs közeli lejárat a következő 30 napban.")
 
 # --- BEÁLLÍTÁSOK ---
 elif menu == "Beállítások":
     st.header("Beállítások")
-    st.text_input("Értesítési e-mail cím")
+    st.subheader("📧 Központi E-mail Konfiguráció")
+    
+    # Itt adjuk meg, honnan menjen az e-mail
+    st.session_state.sender_email = st.text_input("Küldő e-mail cím (erről megy az értesítés)", value="noreply@mindvault.hu")
+    st.session_state.smtp_server = st.text_input("SMTP Szerver (pl. smtp.gmail.com)")
+    st.session_state.smtp_pass = st.text_input("E-mail jelszó / App jelszó", type="password")
+    
     if st.button("Mentés"):
         st.success("Beállítások elmentve!")
