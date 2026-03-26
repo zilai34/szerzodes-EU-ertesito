@@ -51,23 +51,17 @@ if menu == "Alkalmazottak":
     
     with st.expander("➕ Új alkalmazott rögzítése", expanded=True):
         with st.form("add_form"):
-            # 1. SOR: Név és Cég
             col1, col2 = st.columns(2)
             nev = col1.text_input("Név")
             ceg = col2.selectbox("Cég", ["Tornyos Pékség Kft.", "Példa Bt.", "Egyéb"])
             
-            # 2. SOR: Szerződés kezdete és vége
             col3, col4 = st.columns(2)
             sz_kezdete = col3.date_input("Szerződés kezdete", value=date.today())
             sz_vege = col4.date_input("Szerződés vége", value=date.today())
             
-            # 3. SOR: Alkalmassági (külön sor)
             alkalmassagi = st.date_input("Orvosi alkalmassági lejárat", value=date.today())
-            
-            # 4. SOR: Tüdőszűrő (külön sor)
             tudoszuro = st.date_input("Tüdőszűrő lejárat", value=date.today())
             
-            # Mentés gomb
             if st.form_submit_button("Mentés"):
                 if nev:
                     st.session_state.employees.append({
@@ -83,14 +77,10 @@ if menu == "Alkalmazottak":
                 else:
                     st.error("A név kitöltése kötelező!")
 
-    # Táblázat megjelenítése
     if st.session_state.employees:
         df = pd.DataFrame(st.session_state.employees)
-        
-        # Állapot oszlopok hozzáadása a figyelmeztetésekhez
         df['Szerződés állapota'] = df['Szerződés vége'].apply(check_expiry)
         df['Orvosi állapota'] = df['Orvosi lejárat'].apply(check_expiry)
-        
         st.subheader("Aktuális lista")
         st.dataframe(df, use_container_width=True)
     else:
@@ -100,4 +90,15 @@ if menu == "Alkalmazottak":
 elif menu == "Vezérlőpult":
     st.header("Vezérlőpult")
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Összes alkalmazott", len(st
+    # Itt volt a hiba, most javítva:
+    c1.metric("Összes alkalmazott", len(st.session_state.employees))
+    c2.metric("Rendszer állapot", "Aktív")
+    st.write("---")
+    st.info("Válassza az 'Alkalmazottak' menüpontot az adatok rögzítéséhez.")
+
+# --- BEÁLLÍTÁSOK ---
+elif menu == "Beállítások":
+    st.header("Beállítások")
+    st.text_input("Értesítési e-mail cím")
+    if st.button("Mentés"):
+        st.success("Beállítások elmentve!")
