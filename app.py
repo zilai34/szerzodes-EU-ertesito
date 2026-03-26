@@ -31,7 +31,7 @@ with st.sidebar:
 if 'employees' not in st.session_state:
     st.session_state.employees = []
 
-# Segédfüggvény a lejáratok színezéséhez
+# Segédfüggvény a lejáratok színezéséhez a táblázatban
 def check_expiry(date_val):
     try:
         if isinstance(date_val, str):
@@ -46,8 +46,44 @@ def check_expiry(date_val):
     except:
         return "❓ -"
 
+# --- VEZÉRLŐPULT ---
+if menu == "Vezérlőpult":
+    st.header("Vezérlőpult")
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Összes alkalmazott", len(st.session_state.employees))
+    c2.metric("Rendszer állapot", "Aktív")
+    
+    st.write("---")
+    st.subheader("🔔 Közelgő lejáratok (30 napon belül)")
+    
+    found_any = False
+    for emp in st.session_state.employees:
+        # 1. SZERZŐDÉS ELLENŐRZÉSE
+        d_sz = datetime.strptime(emp['Szerződés vége'], "%Y-%m-%d").date()
+        diff_sz = (d_sz - date.today()).days
+        if 0 <= diff_sz <= 30:
+            st.error(f"📄 **{emp['Név']}** munkaszerződése lejár **{diff_sz}** nap múlva! (Email: {emp['Email']})")
+            found_any = True
+
+        # 2. ORVOSI ELLENŐRZÉSE
+        d_orv = datetime.strptime(emp['Orvosi lejárat'], "%Y-%m-%d").date()
+        diff_orv = (d_orv - date.today()).days
+        if 0 <= diff_orv <= 30:
+            st.warning(f"⚕️ **{emp['Név']}** orvosi alkalmassága lejár **{diff_orv}** nap múlva! (Email: {emp['Email']})")
+            found_any = True
+            
+        # 3. TÜDŐSZŰRŐ ELLENŐRZÉSE
+        d_tud = datetime.strptime(emp['Tüdőszűrő lejárat'], "%Y-%m-%d").date()
+        diff_tud = (d_tud - date.today()).days
+        if 0 <= diff_tud <= 30:
+            st.info(f"🫁 **{emp['Név']}** tüdőszűrője lejár **{diff_tud}** nap múlva! (Email: {emp['Email']})")
+            found_any = True
+    
+    if not found_any:
+        st.success("Nincs közeli lejárat a következő 30 napban.")
+
 # --- ALKALMAZOTTAK NÉZET ---
-if menu == "Alkalmazottak":
+elif menu == "Alkalmazottak":
     st.header("Alkalmazottak nyilvántartása")
     
     with st.expander("➕ Új alkalmazott rögzítése", expanded=True):
@@ -63,7 +99,6 @@ if menu == "Alkalmazottak":
             alkalmassagi = st.date_input("Orvosi alkalmassági lejárat", value=date.today())
             tudoszuro = st.date_input("Tüdőszűrő lejárat", value=date.today())
             
-            # ÚJ MEZŐ: Alkalmazott e-mail címe
             email = st.text_input("Alkalmazott e-mail címe (értesítésekhez)")
             
             if st.form_submit_button("Mentés"):
@@ -79,50 +114,23 @@ if menu == "Alkalmazottak":
                     })
                     st.success(f"{nev} rögzítve!")
                     st.rerun()
-                elif not email:
-                    st.error("Az e-mail cím kitöltése kötelező az értesítésekhez!")
                 else:
-                    st.error("A név kitöltése kötelező!")
+                    st.error("A név és e-mail kitöltése kötelező!")
 
     if st.session_state.employees:
         df = pd.DataFrame(st.session_state.employees)
-        df['Orvosi állapota'] = df['Orvosi lejárat'].apply(check_expiry)
         st.subheader("Aktuális lista")
         st.dataframe(df, use_container_width=True)
     else:
         st.info("Még nincs rögzített alkalmazott.")
 
-# --- VEZÉRLŐPULT ---
-elif menu == "Vezérlőpult":
-    st.header("Vezérlőpult")
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Összes alkalmazott", len(st.session_state.employees))
-    c2.metric("Rendszer állapot", "Aktív")
-    
-    # Gyors lista a közeli lejáratokról
-    st.write("---")
-    st.subheader("🔔 Közelgő lejáratok (30 napon belül)")
-    
-    found_any = False
-    for emp in st.session_state.employees:
-        d = datetime.strptime(emp['Orvosi lejárat'], "%Y-%m-%d").date()
-        diff = (d - date.today()).days
-        if 0 <= diff <= 30:
-            st.warning(f"**{emp['Név']}** orvosi alkalmassága lejár {diff} nap múlva! (Email: {emp['Email']})")
-            found_any = True
-    
-    if not found_any:
-        st.success("Nincs közeli lejárat a következő 30 napban.")
-
 # --- BEÁLLÍTÁSOK ---
 elif menu == "Beállítások":
     st.header("Beállítások")
     st.subheader("📧 Központi E-mail Konfiguráció")
-    
-    # Itt adjuk meg, honnan menjen az e-mail
-    st.session_state.sender_email = st.text_input("Küldő e-mail cím (erről megy az értesítés)", value="noreply@mindvault.hu")
-    st.session_state.smtp_server = st.text_input("SMTP Szerver (pl. smtp.gmail.com)")
-    st.session_state.smtp_pass = st.text_input("E-mail jelszó / App jelszó", type="password")
+    st.session_state.sender_email = st.text_input("Küldő e-mail cím", value="noreply@mindvault.hu")
+    st.session_state.smtp_server = st.text_input("SMTP Szerver")
+    st.session_state.smtp_pass = st.text_input("E-mail jelszó", type="password")
     
     if st.button("Mentés"):
         st.success("Beállítások elmentve!")
